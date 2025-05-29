@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func SetupRouter() *http.Server {
+func SetupRouter() http.Handler {
 	mux := http.NewServeMux()
 
 	// API REST
@@ -31,10 +31,7 @@ func SetupRouter() *http.Server {
 	mux.HandleFunc("/add", rootHandler("web/templates/add.html"))
 	mux.HandleFunc("/estadisticas", rootHandler("web/templates/estadisticas.html"))
 
-	return &http.Server{
-		Addr:    ":8080",
-		Handler: mux,
-	}
+	return mux // <- esta es la corrección principal
 }
 
 func rootHandler(file string) http.HandlerFunc {

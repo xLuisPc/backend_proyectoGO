@@ -19,6 +19,12 @@ func SetupRouter() http.Handler {
 			http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		}
 	})
+
+	mux.HandleFunc("/api/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok","origen":"backend"}`))
+	})
+
 	mux.HandleFunc("/api/estadisticas", handlers.ObtenerClusters)
 	mux.HandleFunc("/api/prediccion", handlers.PredecirCluster)
 

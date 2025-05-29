@@ -20,11 +20,6 @@ func SetupRouter() http.Handler {
 		}
 	})
 
-	mux.HandleFunc("/api/ping", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","origen":"backend"}`))
-	})
-
 	mux.HandleFunc("/api/estadisticas", handlers.ObtenerClusters)
 	mux.HandleFunc("/api/prediccion", handlers.PredecirCluster)
 
@@ -36,6 +31,11 @@ func SetupRouter() http.Handler {
 	mux.HandleFunc("/", rootHandler("web/templates/index.html"))
 	mux.HandleFunc("/add", rootHandler("web/templates/add.html"))
 	mux.HandleFunc("/estadisticas", rootHandler("web/templates/estadisticas.html"))
+
+	mux.HandleFunc("/api/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok","origen":"backend"}`))
+	})
 
 	return mux // <- esta es la corrección principal
 }

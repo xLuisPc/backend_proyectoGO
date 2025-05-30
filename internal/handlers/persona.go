@@ -49,7 +49,7 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 		suma += *persona.CircuitosDigitales
 		cuenta++
 	}
-	persona.Promedio = suma / float64(cuenta)
+	persona.Promedio = suma / 5
 
 	// Obtener nuevo ID
 	var ultimoID int

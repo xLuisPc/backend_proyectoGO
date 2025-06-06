@@ -7,11 +7,18 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"strings"
 )
 
 type CorrelacionResponse struct {
 	Labels []string    `json:"labels"`
 	Matrix [][]float64 `json:"matrix"`
+}
+
+var columnasDisponibles = []string{
+	"genero_accion", "genero_ciencia_ficcion", "genero_comedia", "genero_terror",
+	"genero_documental", "genero_romance", "genero_musicales",
+	"poo", "calculo_multivariado", "promedio",
 }
 
 func ObtenerCorrelacion(w http.ResponseWriter, r *http.Request) {
@@ -24,55 +31,53 @@ func ObtenerCorrelacion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.DB.Query(`
-		SELECT 
-			genero_accion, genero_ciencia_ficcion, genero_comedia, genero_terror,
-			genero_documental, genero_romance, genero_musicales,
-			poo, calculo_multivariado, promedio
-		FROM dbpersonas`)
+	// Leer las variables desde el query param
+	seleccionadas := columnasDisponibles
+	query := r.URL.Query().Get("vars")
+	if query != "" {
+		seleccionadas = []string{}
+		for _, v := range strings.Split(query, ",") {
+			v = strings.TrimSpace(v)
+			for _, col := range columnasDisponibles {
+				if v == col {
+					seleccionadas = append(seleccionadas, v)
+				}
+			}
+		}
+	}
+
+	// Construir query SQL solo con las columnas seleccionadas
+	sql := "SELECT " + strings.Join(seleccionadas, ", ") + " FROM dbpersonas"
+
+	rows, err := db.DB.Query(sql)
 	if err != nil {
 		log.Println("ERROR QUERY:", err)
-		http.Error(w, "Error al consultar la base de datos", http.StatusInternalServerError)
+		http.Error(w, "Error consultando columnas seleccionadas", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
 	var datos [][]float64
-
 	for rows.Next() {
-		var g1, g2, g3, g4, g5, g6, g7 int
-		var poo, calc, promedio float64
-
-		err := rows.Scan(&g1, &g2, &g3, &g4, &g5, &g6, &g7, &poo, &calc, &promedio)
-		if err != nil {
+		values := make([]interface{}, len(seleccionadas))
+		floatRefs := make([]float64, len(seleccionadas))
+		for i := range floatRefs {
+			values[i] = &floatRefs[i]
+		}
+		if err := rows.Scan(values...); err != nil {
 			continue
 		}
-
-		if poo >= 0 && calc >= 0 {
-			vector := []float64{
-				float64(g1), float64(g2), float64(g3), float64(g4),
-				float64(g5), float64(g6), float64(g7),
-				poo, calc, promedio,
-			}
-			datos = append(datos, vector)
-		}
+		datos = append(datos, floatRefs)
 	}
 
 	if len(datos) == 0 {
-		http.Error(w, "No hay datos suficientes", http.StatusInternalServerError)
+		http.Error(w, "Sin datos válidos", http.StatusInternalServerError)
 		return
 	}
 
 	matrix := calcularMatrizCorrelacion(datos)
-
-	labels := []string{
-		"Acción", "Ciencia Ficción", "Comedia", "Terror",
-		"Documental", "Romance", "Musicales",
-		"POO", "Cálculo", "Promedio",
-	}
-
 	respuesta := CorrelacionResponse{
-		Labels: labels,
+		Labels: seleccionadas,
 		Matrix: matrix,
 	}
 
@@ -85,21 +90,23 @@ func calcularMatrizCorrelacion(data [][]float64) [][]float64 {
 	m := len(data[0])
 	matrix := make([][]float64, m)
 
-	promedios := make([]float64, m)
-	for i := 0; i < m; i++ {
+	// Promedios
+	prom := make([]float64, m)
+	for i := range prom {
 		for j := 0; j < n; j++ {
-			promedios[i] += data[j][i]
+			prom[i] += data[j][i]
 		}
-		promedios[i] /= float64(n)
+		prom[i] /= float64(n)
 	}
 
+	// Correlación
 	for i := 0; i < m; i++ {
 		matrix[i] = make([]float64, m)
 		for j := 0; j < m; j++ {
-			num, denA, denB := 0.0, 0.0, 0.0
+			var num, denA, denB float64
 			for k := 0; k < n; k++ {
-				a := data[k][i] - promedios[i]
-				b := data[k][j] - promedios[j]
+				a := data[k][i] - prom[i]
+				b := data[k][j] - prom[j]
 				num += a * b
 				denA += a * a
 				denB += b * b

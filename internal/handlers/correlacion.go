@@ -3,19 +3,22 @@ package handlers
 import (
 	"encoding/json"
 	"github.com/xLuisPc/ProyectoGO/internal/db"
+	"github.com/xLuisPc/ProyectoGO/internal/utils"
 	"log"
 	"math"
 	"net/http"
 )
 
-// CorrelacionResponse define la estructura JSON de salida
 type CorrelacionResponse struct {
 	Labels []string    `json:"labels"`
 	Matrix [][]float64 `json:"matrix"`
 }
 
-// Handler para /api/correlacion
 func ObtenerCorrelacion(w http.ResponseWriter, r *http.Request) {
+	if utils.EnableCORS(w, r) {
+		return
+	}
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
@@ -77,23 +80,19 @@ func ObtenerCorrelacion(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(respuesta)
 }
 
-// Calcula la matriz de correlación de Pearson
 func calcularMatrizCorrelacion(data [][]float64) [][]float64 {
 	n := len(data)
 	m := len(data[0])
 	matrix := make([][]float64, m)
 
-	// Calcular promedios
 	promedios := make([]float64, m)
 	for i := 0; i < m; i++ {
-		var sum float64
 		for j := 0; j < n; j++ {
-			sum += data[j][i]
+			promedios[i] += data[j][i]
 		}
-		promedios[i] = sum / float64(n)
+		promedios[i] /= float64(n)
 	}
 
-	// Calcular correlaciones
 	for i := 0; i < m; i++ {
 		matrix[i] = make([]float64, m)
 		for j := 0; j < m; j++ {

@@ -1,13 +1,16 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"github.com/xLuisPc/ProyectoGO/internal/db"
 	"github.com/xLuisPc/ProyectoGO/internal/models"
 	"log"
 	"net/http"
 )
+
+func floatPtr(v float64) *float64 {
+	return &v
+}
 
 func CrearPersona(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -22,34 +25,40 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calcular promedio de campos no nulos
+	// Asignar -1.0 como puntero para materias no aplicables
+	switch persona.Carrera {
+	case "Ingeniería de Sistemas":
+		persona.ControlAnalogo = floatPtr(-1)
+		persona.CircuitosDigitales = floatPtr(-1)
+	case "Ingeniería Electrónica":
+		persona.IngenieriaSoftware = floatPtr(-1)
+		persona.BasesDatos = floatPtr(-1)
+	}
+
+	// Calcular promedio ignorando campos nil o -1
 	var suma float64
 	var cuenta int
 
-	suma += persona.Poo
-	cuenta++
-	suma += persona.Ctd
-	cuenta++
-	suma += persona.CalculoMultivariado
-	cuenta++
+	valores := []*float64{
+		floatPtr(persona.Poo),
+		floatPtr(persona.Ctd),
+		floatPtr(persona.CalculoMultivariado),
+		persona.IngenieriaSoftware,
+		persona.BasesDatos,
+		persona.ControlAnalogo,
+		persona.CircuitosDigitales,
+	}
 
-	if persona.IngenieriaSoftware != nil {
-		suma += *persona.IngenieriaSoftware
-		cuenta++
+	for _, nota := range valores {
+		if nota != nil && *nota >= 0 {
+			suma += *nota
+			cuenta++
+		}
 	}
-	if persona.BasesDatos != nil {
-		suma += *persona.BasesDatos
-		cuenta++
+
+	if cuenta > 0 {
+		persona.Promedio = suma / float64(cuenta)
 	}
-	if persona.ControlAnalogo != nil {
-		suma += *persona.ControlAnalogo
-		cuenta++
-	}
-	if persona.CircuitosDigitales != nil {
-		suma += *persona.CircuitosDigitales
-		cuenta++
-	}
-	persona.Promedio = suma / 5
 
 	// Obtener nuevo ID
 	var ultimoID int
@@ -61,15 +70,16 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 	}
 	nuevoID := ultimoID + 1
 
-	// Insertar con NullFloat64
+	// Insertar estudiante
 	query := `
-        INSERT INTO dbpersonas (
-            id, carrera, genero_accion, genero_ciencia_ficcion, genero_comedia,
-            genero_terror, genero_documental, genero_romance, genero_musicales,
-            poo, calculo_multivariado, ctd, ingenieria_software, bases_datos,
-            control_analogo, circuitos_digitales, promedio
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-    `
+		INSERT INTO dbpersonas (
+			id, carrera, genero_accion, genero_ciencia_ficcion, genero_comedia,
+			genero_terror, genero_documental, genero_romance, genero_musicales,
+			poo, calculo_multivariado, ctd,
+			ingenieria_software, bases_datos, control_analogo, circuitos_digitales,
+			promedio
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+	`
 	_, err = db.DB.Exec(query,
 		nuevoID,
 		persona.Carrera,
@@ -83,10 +93,10 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 		persona.Poo,
 		persona.CalculoMultivariado,
 		persona.Ctd,
-		nullFloat64(persona.IngenieriaSoftware),
-		nullFloat64(persona.BasesDatos),
-		nullFloat64(persona.ControlAnalogo),
-		nullFloat64(persona.CircuitosDigitales),
+		getOrDefault(persona.IngenieriaSoftware),
+		getOrDefault(persona.BasesDatos),
+		getOrDefault(persona.ControlAnalogo),
+		getOrDefault(persona.CircuitosDigitales),
 		persona.Promedio,
 	)
 	if err != nil {
@@ -99,17 +109,26 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Persona agregada correctamente"))
 }
 
+func getOrDefault(p *float64) float64 {
+	if p != nil {
+		return *p
+	}
+	return -1
+}
+
 func ListarPersonas(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
-	rows, err := db.DB.Query(`SELECT 
-        id, carrera, genero_accion, genero_ciencia_ficcion, genero_comedia, genero_terror,
-        genero_documental, genero_romance, genero_musicales,
-        poo, calculo_multivariado, ctd, ingenieria_software, bases_datos,
-        control_analogo, circuitos_digitales, promedio FROM dbpersonas`)
+	rows, err := db.DB.Query(`
+		SELECT 
+			id, carrera, genero_accion, genero_ciencia_ficcion, genero_comedia, genero_terror,
+			genero_documental, genero_romance, genero_musicales,
+			poo, calculo_multivariado, ctd,
+			ingenieria_software, bases_datos, control_analogo, circuitos_digitales, promedio 
+		FROM dbpersonas`)
 	if err != nil {
 		log.Println("ERROR CONSULTA:", err)
 		http.Error(w, "Error al consultar la base de datos", http.StatusInternalServerError)
@@ -121,14 +140,13 @@ func ListarPersonas(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var p models.Persona
-		var ingSoft, bases, analogo, digitales sql.NullFloat64
 
 		err := rows.Scan(
 			&p.ID, &p.Carrera,
 			&p.GeneroAccion, &p.GeneroCienciaFiccion, &p.GeneroComedia, &p.GeneroTerror,
 			&p.GeneroDocumental, &p.GeneroRomance, &p.GeneroMusicales,
 			&p.Poo, &p.CalculoMultivariado, &p.Ctd,
-			&ingSoft, &bases, &analogo, &digitales,
+			&p.IngenieriaSoftware, &p.BasesDatos, &p.ControlAnalogo, &p.CircuitosDigitales,
 			&p.Promedio,
 		)
 		if err != nil {
@@ -137,31 +155,9 @@ func ListarPersonas(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Asignar si es válido
-		if ingSoft.Valid {
-			p.IngenieriaSoftware = &ingSoft.Float64
-		}
-		if bases.Valid {
-			p.BasesDatos = &bases.Float64
-		}
-		if analogo.Valid {
-			p.ControlAnalogo = &analogo.Float64
-		}
-		if digitales.Valid {
-			p.CircuitosDigitales = &digitales.Float64
-		}
-
 		personas = append(personas, p)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(personas)
-}
-
-// Función auxiliar para convertir *float64 en sql.NullFloat64
-func nullFloat64(val *float64) sql.NullFloat64 {
-	if val != nil {
-		return sql.NullFloat64{Float64: *val, Valid: true}
-	}
-	return sql.NullFloat64{Valid: false}
 }

@@ -67,7 +67,16 @@ func ObtenerCorrelacion(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(values...); err != nil {
 			continue
 		}
-		datos = append(datos, floatRefs)
+		valid := true
+		for _, v := range floatRefs {
+			if v == -1 {
+				valid = false
+				break
+			}
+		}
+		if valid {
+			datos = append(datos, floatRefs)
+		}
 	}
 
 	if len(datos) == 0 {

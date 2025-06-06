@@ -4,13 +4,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/xLuisPc/ProyectoGO/internal/models"
-	_ "github.com/xLuisPc/ProyectoGO/internal/models"
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/xLuisPc/ProyectoGO/internal/models"
+	_ "github.com/xLuisPc/ProyectoGO/internal/models"
 )
 
+// creando rama
 // CreateTable crea la tabla dbpersonas permitiendo campos que pueden ser NULL.
 func CreateTable(db *sql.DB) {
 	query := `

@@ -2,7 +2,6 @@ package utils
 
 import "net/http"
 
-// EnableCORS habilita los encabezados necesarios para CORS y maneja preflight (OPTIONS).
 func EnableCORS(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Access-Control-Allow-Origin", "https://frontend-proyecto-go.vercel.app")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")

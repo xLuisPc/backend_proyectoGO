@@ -36,6 +36,7 @@ func SetupRouter() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","origen":"backend"}`))
 	})
+	mux.HandleFunc("/api/correlacion", handlers.ObtenerCorrelacion)
 
 	return mux // <- esta es la corrección principal
 }

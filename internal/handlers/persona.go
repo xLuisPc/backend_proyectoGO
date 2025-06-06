@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"github.com/xLuisPc/ProyectoGO/internal/db"
 	"github.com/xLuisPc/ProyectoGO/internal/models"
+	"github.com/xLuisPc/ProyectoGO/internal/utils"
 	"log"
 	"net/http"
 )
 
-func floatPtr(v float64) *float64 {
-	return &v
-}
-
 func CrearPersona(w http.ResponseWriter, r *http.Request) {
+	if utils.EnableCORS(w, r) {
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
@@ -25,7 +26,6 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Asignar -1.0 como puntero para materias no aplicables
 	switch persona.Carrera {
 	case "Ingeniería de Sistemas":
 		persona.ControlAnalogo = floatPtr(-1)
@@ -35,10 +35,8 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 		persona.BasesDatos = floatPtr(-1)
 	}
 
-	// Calcular promedio ignorando campos nil o -1
 	var suma float64
 	var cuenta int
-
 	valores := []*float64{
 		floatPtr(persona.Poo),
 		floatPtr(persona.Ctd),
@@ -48,19 +46,16 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 		persona.ControlAnalogo,
 		persona.CircuitosDigitales,
 	}
-
 	for _, nota := range valores {
 		if nota != nil && *nota >= 0 {
 			suma += *nota
 			cuenta++
 		}
 	}
-
 	if cuenta > 0 {
 		persona.Promedio = suma / float64(cuenta)
 	}
 
-	// Obtener nuevo ID
 	var ultimoID int
 	err = db.DB.QueryRow("SELECT COALESCE(MAX(id), 0) FROM dbpersonas").Scan(&ultimoID)
 	if err != nil {
@@ -70,7 +65,6 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 	}
 	nuevoID := ultimoID + 1
 
-	// Insertar estudiante
 	query := `
 		INSERT INTO dbpersonas (
 			id, carrera, genero_accion, genero_ciencia_ficcion, genero_comedia,
@@ -109,25 +103,21 @@ func CrearPersona(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Persona agregada correctamente"))
 }
 
-func getOrDefault(p *float64) float64 {
-	if p != nil {
-		return *p
-	}
-	return -1
-}
-
 func ListarPersonas(w http.ResponseWriter, r *http.Request) {
+	if utils.EnableCORS(w, r) {
+		return
+	}
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
-	rows, err := db.DB.Query(`
-		SELECT 
-			id, carrera, genero_accion, genero_ciencia_ficcion, genero_comedia, genero_terror,
-			genero_documental, genero_romance, genero_musicales,
-			poo, calculo_multivariado, ctd,
-			ingenieria_software, bases_datos, control_analogo, circuitos_digitales, promedio 
+	rows, err := db.DB.Query(`SELECT 
+		id, carrera, genero_accion, genero_ciencia_ficcion, genero_comedia, genero_terror,
+		genero_documental, genero_romance, genero_musicales,
+		poo, calculo_multivariado, ctd,
+		ingenieria_software, bases_datos, control_analogo, circuitos_digitales, promedio 
 		FROM dbpersonas`)
 	if err != nil {
 		log.Println("ERROR CONSULTA:", err)
@@ -137,10 +127,8 @@ func ListarPersonas(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	var personas []models.Persona
-
 	for rows.Next() {
 		var p models.Persona
-
 		err := rows.Scan(
 			&p.ID, &p.Carrera,
 			&p.GeneroAccion, &p.GeneroCienciaFiccion, &p.GeneroComedia, &p.GeneroTerror,
@@ -154,10 +142,20 @@ func ListarPersonas(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Error al leer resultados", http.StatusInternalServerError)
 			return
 		}
-
 		personas = append(personas, p)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(personas)
+}
+
+func floatPtr(v float64) *float64 {
+	return &v
+}
+
+func getOrDefault(p *float64) float64 {
+	if p != nil {
+		return *p
+	}
+	return -1
 }

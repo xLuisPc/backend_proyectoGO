@@ -5,20 +5,23 @@ import (
 	"github.com/xLuisPc/ProyectoGO/internal/db"
 	"github.com/xLuisPc/ProyectoGO/internal/models"
 	"github.com/xLuisPc/ProyectoGO/internal/services"
+	"github.com/xLuisPc/ProyectoGO/internal/utils"
 	"log"
-	"math"
 	"net/http"
 )
 
 func PredecirCluster(w http.ResponseWriter, r *http.Request) {
+	if utils.EnableCORS(w, r) {
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var nuevo models.Persona
-	err := json.NewDecoder(r.Body).Decode(&nuevo)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&nuevo); err != nil {
 		http.Error(w, "JSON inválido", http.StatusBadRequest)
 		return
 	}
@@ -56,7 +59,6 @@ func PredecirCluster(w http.ResponseWriter, r *http.Request) {
 		promedios = append(promedios, promedio)
 	}
 
-	// Construir vector del nuevo perfil
 	vecNuevo := []float64{
 		float64(nuevo.GeneroAccion),
 		float64(nuevo.GeneroCienciaFiccion),
@@ -65,8 +67,7 @@ func PredecirCluster(w http.ResponseWriter, r *http.Request) {
 		float64(nuevo.GeneroDocumental),
 		float64(nuevo.GeneroRomance),
 		float64(nuevo.GeneroMusicales),
-		-1, // por defecto sin notas
-		-1,
+		-1, -1,
 	}
 
 	if nuevo.Poo >= 0 && nuevo.Poo <= 5 {
@@ -76,12 +77,10 @@ func PredecirCluster(w http.ResponseWriter, r *http.Request) {
 		vecNuevo[8] = nuevo.CalculoMultivariado
 	}
 
-	// Llamar a KNN
 	promedioEstimado := services.KNNPredecirPromedio(dataset, promedios, vecNuevo, 5)
 
-	// Respuesta final
 	response := map[string]interface{}{
-		"promedio": math.Round(promedioEstimado*100) / 100, // redondear a 2 decimales
+		"promedio": promedioEstimado,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

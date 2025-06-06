@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/xLuisPc/ProyectoGO/internal/models"
-	_ "github.com/xLuisPc/ProyectoGO/internal/models"
 )
 
 // creando rama
